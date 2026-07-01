@@ -379,9 +379,18 @@ impl FileWatcher {
     pub fn new() -> notify::Result<Self> {
         let (raw_tx, raw_rx) = mpsc::unbounded_channel();
         let raw_tx_clone = raw_tx;
-        let watcher = notify::recommended_watcher(move |res| {
-            let _ = raw_tx_clone.send(res);
-        })?;
+        // Disable symlink following during recursive watches. A watched root may
+        // contain a directory symlink pointing at an arbitrarily large external
+        // tree (e.g. a Nix store closure), and following it would expand a
+        // single skill root into a watch over the whole tree, hanging startup.
+        // Loading still follows symlinks intentionally; only the watcher opts out.
+        let config = notify::Config::default().with_follow_symlinks(false);
+        let watcher = notify::RecommendedWatcher::new(
+            move |res| {
+                let _ = raw_tx_clone.send(res);
+            },
+            config,
+        )?;
         let inner = FileWatcherInner {
             watcher,
             watched_paths: HashMap::new(),
