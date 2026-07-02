@@ -124,6 +124,40 @@ fn append_schema_search_text(schema: &JsonSchema, parts: &mut Vec<String>) {
     }
 }
 
+/// Recursive schema search-text builder for dynamically-typed JSON schemas.
+///
+/// Mirrors [`append_schema_search_text`], but operates on a `serde_json::Value`
+/// instead of the typed [`JsonSchema`]. MCP tool `input_schema` arrives as an
+/// arbitrary JSON value, so the typed path cannot be used directly without
+/// lossy deserialization. This walks the same structural fields (`description`,
+/// `properties`, `items`, `any_of`) so MCP tools get the same BM25 indexing
+/// fidelity as built-in tools.
+///
+/// Unknown or malformed fields are skipped rather than panicking, since MCP
+/// schemas originate from third-party servers.
+pub fn append_json_value_schema_search_text(
+    schema: &serde_json::Value,
+    parts: &mut Vec<String>,
+) {
+    if let Some(description) = schema.get("description").and_then(serde_json::Value::as_str) {
+        push_search_part(parts, description.to_string());
+    }
+    if let Some(properties) = schema.get("properties").and_then(serde_json::Value::as_object) {
+        for (name, sub_schema) in properties {
+            push_search_part(parts, name.clone());
+            append_json_value_schema_search_text(sub_schema, parts);
+        }
+    }
+    if let Some(items) = schema.get("items") {
+        append_json_value_schema_search_text(items, parts);
+    }
+    if let Some(variants) = schema.get("any_of").and_then(serde_json::Value::as_array) {
+        for variant in variants {
+            append_json_value_schema_search_text(variant, parts);
+        }
+    }
+}
+
 fn push_search_part(parts: &mut Vec<String>, part: String) {
     let part = part.trim();
     if !part.is_empty() {

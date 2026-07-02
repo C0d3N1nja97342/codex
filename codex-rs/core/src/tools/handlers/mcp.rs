@@ -21,6 +21,7 @@ use codex_tools::ResponsesApiNamespaceTool;
 use codex_tools::ToolName;
 use codex_tools::ToolSearchInfo;
 use codex_tools::ToolSearchSourceInfo;
+use codex_tools::append_json_value_schema_search_text;
 use codex_tools::ToolSpec;
 use codex_tools::mcp_tool_to_responses_api_tool;
 use serde_json::Map;
@@ -264,14 +265,6 @@ fn mcp_hook_tool_input(raw_arguments: &str) -> Value {
 
 fn build_mcp_search_text(info: &ToolInfo) -> String {
     let tool_name = info.canonical_tool_name();
-    let mut schema_properties = info
-        .tool
-        .input_schema
-        .get("properties")
-        .and_then(serde_json::Value::as_object)
-        .map(|map| map.keys().cloned().collect::<Vec<_>>())
-        .unwrap_or_default();
-    schema_properties.sort();
     let mut parts = vec![
         flat_tool_name(&tool_name).into_owned(),
         info.callable_name.clone(),
@@ -306,7 +299,15 @@ fn build_mcp_search_text(info: &ToolInfo) -> String {
             .filter(|display_name| !display_name.is_empty())
             .map(str::to_string),
     );
-    parts.extend(schema_properties);
+    // Index the full input schema (parameter names + descriptions + nested
+    // properties/items/any_of) so BM25 retrieval matches parameter-semantics
+    // keywords, matching the fidelity built-in tools get via
+    // `append_schema_search_text`. Previously only top-level parameter names
+    // were indexed, dropping all descriptions and nested schema. The MCP
+    // `input_schema` is an `Arc<Map<String, Value>>`; wrap it as a JSON object
+    // value so the recursive builder walks it uniformly.
+    let input_schema_value = serde_json::Value::Object(info.tool.input_schema.as_ref().clone());
+    append_json_value_schema_search_text(&input_schema_value, &mut parts);
     parts.join(" ")
 }
 

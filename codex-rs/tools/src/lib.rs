@@ -101,6 +101,7 @@ pub use tool_output::ToolOutput;
 pub use tool_payload::ToolPayload;
 pub use tool_search::ToolSearchEntry;
 pub use tool_search::ToolSearchInfo;
+pub use tool_search::append_json_value_schema_search_text;
 pub use tool_spec::ResponsesApiWebSearchFilters;
 pub use tool_spec::ResponsesApiWebSearchUserLocation;
 pub use tool_spec::ToolSpec;
