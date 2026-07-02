@@ -309,7 +309,7 @@ async fn approval_review_returns_first_claim_and_short_circuits() {
     for (name, decision) in [
         ("first", None),
         ("second", Some(ReviewDecision::Approved)),
-        ("third", Some(ReviewDecision::Denied)),
+        ("third", Some(ReviewDecision::Denied { reason: None })),
     ] {
         builder.approval_review_contributor(Arc::new(RecordingApprovalContributor {
             name,

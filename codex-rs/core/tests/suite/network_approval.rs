@@ -131,7 +131,7 @@ async fn approved_network_host_for_one_environment_still_prompts_in_another() ->
         .submit(Op::ExecApproval {
             id: approval.effective_approval_id(),
             turn_id: None,
-            decision: ReviewDecision::Denied,
+            decision: ReviewDecision::Denied { reason: None },
         })
         .await?;
     wait_for_turn_complete(&test).await;

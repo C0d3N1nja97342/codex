@@ -1987,7 +1987,7 @@ fn map_file_change_approval_decision(decision: FileChangeApprovalDecision) -> Re
     match decision {
         FileChangeApprovalDecision::Accept => ReviewDecision::Approved,
         FileChangeApprovalDecision::AcceptForSession => ReviewDecision::ApprovedForSession,
-        FileChangeApprovalDecision::Decline => ReviewDecision::Denied,
+        FileChangeApprovalDecision::Decline => ReviewDecision::Denied { reason: None },
         FileChangeApprovalDecision::Cancel => ReviewDecision::Abort,
     }
 }
@@ -2019,11 +2019,11 @@ async fn on_file_change_request_approval_response(
         Ok(Err(err)) if is_turn_transition_server_request_error(&err) => return,
         Ok(Err(err)) => {
             error!("request failed with client error: {err:?}");
-            ReviewDecision::Denied
+            ReviewDecision::Denied { reason: None }
         }
         Err(err) => {
             error!("request failed: {err:?}");
-            ReviewDecision::Denied
+            ReviewDecision::Denied { reason: None }
         }
     };
 
@@ -2095,7 +2095,7 @@ async fn on_command_execution_request_approval_response(
                     )
                 }
                 CommandExecutionApprovalDecision::Decline => (
-                    ReviewDecision::Denied,
+                    ReviewDecision::Denied { reason: None },
                     Some(CommandExecutionStatus::Declined),
                 ),
                 CommandExecutionApprovalDecision::Cancel => (
@@ -2108,11 +2108,11 @@ async fn on_command_execution_request_approval_response(
         Ok(Err(err)) if is_turn_transition_server_request_error(&err) => return,
         Ok(Err(err)) => {
             error!("request failed with client error: {err:?}");
-            (ReviewDecision::Denied, Some(CommandExecutionStatus::Failed))
+            (ReviewDecision::Denied { reason: None }, Some(CommandExecutionStatus::Failed))
         }
         Err(err) => {
             error!("request failed: {err:?}");
-            (ReviewDecision::Denied, Some(CommandExecutionStatus::Failed))
+            (ReviewDecision::Denied { reason: None }, Some(CommandExecutionStatus::Failed))
         }
     };
 

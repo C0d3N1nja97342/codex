@@ -3886,7 +3886,7 @@ pub struct ThreadGoalUpdatedEvent {
 }
 
 /// User's decision in response to an ExecApprovalRequest.
-#[derive(Debug, Default, Clone, Deserialize, Serialize, PartialEq, Eq, Display, JsonSchema, TS)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, Display, JsonSchema, TS)]
 #[serde(rename_all = "snake_case")]
 pub enum ReviewDecision {
     /// User has approved this command and the agent should execute it.
@@ -3911,8 +3911,16 @@ pub enum ReviewDecision {
 
     /// User has denied this command and the agent should not execute it, but
     /// it should continue the session and try something else.
-    #[default]
-    Denied,
+    ///
+    /// `reason` carries an optional, user-supplied explanation for the denial.
+    /// When present it is surfaced to the model so the agent can adapt its
+    /// next step instead of seeing only a generic "rejected by user". The
+    /// field is `#[serde(default)]` so existing clients that send a bare
+    /// `"denied"` deserialize with `reason: None` and remain compatible.
+    Denied {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        reason: Option<String>,
+    },
 
     /// Automatic approval review timed out before reaching a decision.
     TimedOut,
@@ -3920,6 +3928,15 @@ pub enum ReviewDecision {
     /// User has denied this command and the agent should not do anything until
     /// the user's next command.
     Abort,
+}
+
+// `#[derive(Default)]` cannot annotate a struct variant with `#[default]`, so
+// implement it manually. `Denied { reason: None }` preserves the prior default
+// (a bare denial with no explanation).
+impl Default for ReviewDecision {
+    fn default() -> Self {
+        ReviewDecision::Denied { reason: None }
+    }
 }
 
 impl ReviewDecision {
@@ -3936,7 +3953,7 @@ impl ReviewDecision {
                 NetworkPolicyRuleAction::Allow => "approved_with_network_policy_allow",
                 NetworkPolicyRuleAction::Deny => "denied_with_network_policy_deny",
             },
-            ReviewDecision::Denied => "denied",
+            ReviewDecision::Denied { .. } => "denied",
             ReviewDecision::TimedOut => "timed_out",
             ReviewDecision::Abort => "abort",
         }

@@ -1461,9 +1461,19 @@ async fn mcp_tool_approval_decision_from_guardian(
         | ReviewDecision::ApprovedExecpolicyAmendment { .. }
         | ReviewDecision::NetworkPolicyAmendment { .. } => McpToolApprovalDecision::Accept,
         ReviewDecision::ApprovedForSession => McpToolApprovalDecision::AcceptForSession,
-        ReviewDecision::Denied => McpToolApprovalDecision::Decline {
-            message: Some(guardian_rejection_message(sess, review_id).await),
-        },
+        ReviewDecision::Denied { reason } => {
+            let message = match reason
+                .as_deref()
+                .map(str::trim)
+                .filter(|reason| !reason.is_empty())
+            {
+                Some(user_reason) => user_reason.to_string(),
+                None => guardian_rejection_message(sess, review_id).await,
+            };
+            McpToolApprovalDecision::Decline {
+                message: Some(message),
+            }
+        }
         ReviewDecision::TimedOut => McpToolApprovalDecision::Decline {
             message: Some(guardian_timeout_message()),
         },

@@ -408,12 +408,25 @@ impl ToolEmitter {
                 // which means a subset of non-user failures may be reported as Declined.
                 //
                 // TODO: We should add a new ToolError variant for user-declined approvals.
-                let normalized = if msg == "rejected by user" {
-                    match self {
+                //
+                // A user-supplied denial reason (when present) is appended to the
+                // normalized phrase so the model sees both the consistent framing
+                // and the human explanation, e.g.
+                // "exec command rejected by user: use --force-with-lease instead".
+                let user_reason = msg
+                    .strip_prefix("rejected by user: ")
+                    .map(str::trim)
+                    .filter(|reason| !reason.is_empty());
+                let normalized = if msg == "rejected by user" || user_reason.is_some() {
+                    let base = match self {
                         Self::Shell { .. } | Self::UnifiedExec { .. } => {
-                            "exec command rejected by user".to_string()
+                            "exec command rejected by user"
                         }
-                        Self::ApplyPatch { .. } => "patch rejected by user".to_string(),
+                        Self::ApplyPatch { .. } => "patch rejected by user",
+                    };
+                    match user_reason {
+                        Some(reason) => format!("{base}: {reason}"),
+                        None => base.to_string(),
                     }
                 } else {
                     msg

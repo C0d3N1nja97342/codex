@@ -545,7 +545,9 @@ impl ToolOrchestrator {
                     return Ok(decision);
                 }
                 Some(PermissionRequestDecision::Deny { message }) => {
-                    let decision = ReviewDecision::Denied;
+                    let decision = ReviewDecision::Denied {
+                        reason: Some(message.clone()),
+                    };
                     otel.tool_decision(
                         tool_name.as_ref(),
                         &tool_ctx.call_id,
@@ -580,14 +582,24 @@ impl ToolOrchestrator {
         decision: ReviewDecision,
     ) -> Result<(), ToolError> {
         match decision {
-            ReviewDecision::Denied | ReviewDecision::Abort => {
-                let reason = if let Some(review_id) = guardian_review_id {
+            ReviewDecision::Denied { reason: user_reason } => {
+                // Prefer an explicit user-supplied reason so the model can adapt
+                // its next step. Fall back to the guardian rejection message
+                // (e.g. auto-review denial), then the generic phrase.
+                let reason = if let Some(user_reason) = user_reason
+                    .as_deref()
+                    .map(str::trim)
+                    .filter(|reason| !reason.is_empty())
+                {
+                    format!("rejected by user: {user_reason}")
+                } else if let Some(review_id) = guardian_review_id {
                     guardian_rejection_message(tool_ctx.session.as_ref(), review_id).await
                 } else {
                     "rejected by user".to_string()
                 };
                 Err(ToolError::Rejected(reason))
             }
+            ReviewDecision::Abort => Err(ToolError::Rejected("rejected by user".to_string())),
             ReviewDecision::TimedOut => Err(ToolError::Rejected(guardian_timeout_message())),
             ReviewDecision::Approved
             | ReviewDecision::ApprovedExecpolicyAmendment { .. }

@@ -480,7 +480,9 @@ impl CoreShellActionProvider {
                     }
                     Some(PermissionRequestDecision::Deny { message }) => {
                         return PromptDecision {
-                            decision: ReviewDecision::Denied,
+                            decision: ReviewDecision::Denied {
+                                reason: Some(message.clone()),
+                            },
                             guardian_review_id: None,
                             rejection_message: Some(message),
                         };
@@ -586,8 +588,14 @@ impl CoreShellActionProvider {
                                 EscalationDecision::deny(Some("User denied execution".to_string()))
                             }
                         },
-                        ReviewDecision::Denied => {
-                            let message = if let Some(message) =
+                        ReviewDecision::Denied { reason } => {
+                            let message = if let Some(reason) = reason
+                                .as_deref()
+                                .map(str::trim)
+                                .filter(|reason| !reason.is_empty())
+                            {
+                                reason.to_string()
+                            } else if let Some(message) =
                                 prompt_decision.rejection_message.clone()
                             {
                                 message
